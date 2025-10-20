@@ -1,2 +1,2 @@
 # Matrix-Library
-Standrd Matrix Library in C
+Standard Matrix Library in C
