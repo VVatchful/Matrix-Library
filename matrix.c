@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-
+#include <time.h>
 typedef struct {
   int rows;
   int cols;
@@ -50,6 +50,9 @@ void deloc_matrix(Matrix *m) {
 }
 
 int main() {
+
+  srand(time(NULL));
+
   Matrix *_Matrix = create_matrix(2,3);
   if (_Matrix != NULL) {
     _Matrix->data[0][0] = 5;
@@ -60,6 +63,19 @@ int main() {
 
 }
 
-void fun(void)
-{
+void init_zero(Matrix *m) {
+  for(int i = 0; i < m->rows; i++) {
+    for (int j = 0; J < m->cols; j++) {
+      m->data[i][j] = 0;
+    }
+  }
+}
+
+void init_random(Matrix *m, int min_value, int max_value) {
+  for (int i = 0; i < m->rows; i++) {
+    for (int j = 0; j < m->cols; j++) {
+      int rand_val = rand() % (max_value - min_value +1) + min_value;
+      m->data[i][j] = rand_val;
+    }
+  }
 }
