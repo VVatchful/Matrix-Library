@@ -79,3 +79,13 @@ void init_random(Matrix *m, int min_value, int max_value) {
     }
   }
 }
+
+void matrix_print(Matrix *m) {
+ for (int i = 0; i < m->rows; i++) {
+   for (int j = 0; j < m->cols; j++) {
+     printf("%d ", m->data[i][j]);
+  }
+  printf("\n");
+ }
+ printf("\n");
+}
