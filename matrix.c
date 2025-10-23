@@ -89,3 +89,18 @@ void matrix_print(Matrix *m) {
  }
  printf("\n");
 }
+
+Matrix* dupe_matrix(Matrix *m) {
+  Matrix *destination = create_matrix(m->rows, m->cols);
+
+  if (destination == NULL) {
+    return NULL
+  }
+
+  for (int i = 0; i < m->rows; i++) {
+    for (int j = 0; j < m->cols; j++) {
+      destination->data[i][j] = m->data[i][j];
+    }
+  }
+  return destination;
+}
