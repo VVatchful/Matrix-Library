@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <time.h>
+
 typedef struct {
   int rows;
   int cols;
@@ -40,7 +41,7 @@ Matrix* create_matrix(int r,int c) {
   return m;
 }
 
-void deloc_matrix(Matrix *m) {
+void dealloc_matrix(Matrix *m) {
   if (m == NULL) return;
   for (int i = 0; i < m->rows; i++) {
     free(m->data[i]);
@@ -49,23 +50,9 @@ void deloc_matrix(Matrix *m) {
   free(m);
 }
 
-int main() {
-
-  srand(time(NULL));
-
-  Matrix *_Matrix = create_matrix(2,3);
-  if (_Matrix != NULL) {
-    _Matrix->data[0][0] = 5;
-    printf("Element at (0,0): %d\n", _Matrix->data[0][0]);
-    deloc_matrix(_Matrix);
-  }
-  return 0;
-
-}
-
 void init_zero(Matrix *m) {
   for(int i = 0; i < m->rows; i++) {
-    for (int j = 0; J < m->cols; j++) {
+    for (int j = 0; j < m->cols; j++) {
       m->data[i][j] = 0;
     }
   }
@@ -94,7 +81,7 @@ Matrix* dupe_matrix(Matrix *m) {
   Matrix *destination = create_matrix(m->rows, m->cols);
 
   if (destination == NULL) {
-    return NULL
+    return NULL;
   }
 
   for (int i = 0; i < m->rows; i++) {
@@ -104,3 +91,38 @@ Matrix* dupe_matrix(Matrix *m) {
   }
   return destination;
 }
+
+Matrix* addition(Matrix *A, Matrix *B) {
+  if (A->rows != B->rows || A->cols != B->cols) {
+    printf("Needs to be the same dimensions\n");
+    return NULL;
+  }
+
+  Matrix *C = create_matrix(A->rows, A->cols);
+  if (C == NULL) {
+    return NULL;
+  }
+
+  for (int i = 0; i < A->rows; i++) {
+    for (int j = 0; j < A->cols; j++) {
+      C->data[i][j] = A->data[i][j] + B->data[i][j];
+    }
+  }
+  return C;
+}
+
+int main() {
+
+  srand(time(NULL));
+
+  Matrix *_Matrix = create_matrix(2,3);
+  if (_Matrix != NULL) {
+    _Matrix->data[0][0] = 5;
+    printf("Element at (0,0): %d\n", _Matrix->data[0][0]);
+    dealloc_matrix(_Matrix);
+  }
+  return 0;
+
+}
+
+
