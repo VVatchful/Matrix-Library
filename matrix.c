@@ -111,7 +111,7 @@ Matrix* addition(Matrix *A, Matrix *B) {
   return C;
 }
 
-Matrix* multiply(Matrix *m, scalar) {
+Matrix* multiply(Matrix *m, int scalar) {
   Matrix *result = create_matrix(m->rows, m->cols);
 
   if (result == NULL) {
@@ -132,7 +132,12 @@ Matrix* transpose(Matrix *m) {
     return NULL;
   }
 
-  for (int i = 0; i < )
+  for (int i = 0; i < m->rows; i++) {
+    for (int j = 0; j < m->cols; j++) {
+      result->data[j][i] = m->data[i][j];
+    }
+  }
+  return result;
 }
 
 int main() {
