@@ -111,6 +111,30 @@ Matrix* addition(Matrix *A, Matrix *B) {
   return C;
 }
 
+Matrix* multiply(Matrix *m, scalar) {
+  Matrix *result = create_matrix(m->rows, m->cols);
+
+  if (result == NULL) {
+    return NULL;
+  }
+
+  for (int i = 0; i < m->rows; i++) {
+    for (int j = 0; j < m->cols; j++) {
+      result->data[i][j] = m->data[i][j] * scalar;
+    }
+  }
+  return result;
+}
+
+Matrix* transpose(Matrix *m) {
+  Matrix *result = create_matrix(m->cols, m->rows);
+  if (result == NULL) {
+    return NULL;
+  }
+
+  for (int i = 0; i < )
+}
+
 int main() {
 
   srand(time(NULL));
