@@ -111,7 +111,7 @@ Matrix* addition(Matrix *A, Matrix *B) {
   return C;
 }
 
-Matrix* multiply(Matrix *m, int scalar) {
+Matrix* scalar_multiply(Matrix *m, int scalar) {
   Matrix *result = create_matrix(m->rows, m->cols);
 
   if (result == NULL) {
@@ -138,6 +138,50 @@ Matrix* transpose(Matrix *m) {
     }
   }
   return result;
+}
+
+Matrix* multiply_matrix(Matrix *A, Matrix *B){
+    if (A->cols != B->rows) {
+        printf("Cannot multiply: A != B \n");
+        return NULL;
+    }
+
+    Matrix *C = create_matrix(A->rows, B->cols);
+    if (C == NULL) {
+        return NULL;
+    }
+    int sum = 0;
+    for (int i = 0; i < A->rows; i++) {
+        for (int j = 0; j < B->cols; j++) {
+            for (k = 0; k < A->cols; k++) {
+                sum = sum + (A->data[i][k] * B->data[k][j]);
+            }
+
+            C->data[i][j] = sum;
+        }
+    }
+
+    return C;
+}
+
+void test_addition() {
+    Matrix *A = create_matrix(2, 2);
+    Matrix *B = create_matrix(2, 2);
+
+    A->data[0][0] = 1, A->data[0][1] = 2;
+    A->data[1][0] = 3, A->data[1][1] = 4;
+
+    B->data[0][0] = 1, B->data[0][1] = 2;
+    B->data[1][0] = 3, B->data[1][1] = 4;
+
+    printf("Matrix A:\n");
+    print_matrix(A);
+    printf("Matrix B:\n"``);
+    print_matrix(B);
+
+    dealloc_matrix(A);
+    dealloc_matrix(B);
+    dealloc_matrix(C);
 }
 
 int main() {
