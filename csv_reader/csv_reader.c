@@ -1,6 +1,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <string.h>
+#include <errno.h>
 
 struct stockRecord {
     int year;
@@ -30,4 +32,16 @@ struct parserResults {
     int line_number;
 };
 
-
+int stock_data_csv() {
+    const char *filename = "../CSV/all_stocks_combined.csv";
+    FILE *file = fopen("../CSV/all_stocks_combined.csv", "r");
+    if (file == NULL) {
+        fprintf(stderr, "Error opening CSV file: %s : %s/n", filename, strerror(errno));
+        fclose(file);
+        return 0;
+    } else {
+        perror("Persmission was denied or could not be opened. Please check your file perms:");
+        return 0;
+    }
+    
+}
