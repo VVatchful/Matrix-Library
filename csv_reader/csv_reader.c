@@ -28,8 +28,9 @@ struct stockData {
 struct parserResults {
     bool success;
     char error_message[256];
-    char tokens[256];
+    char* tokens[10][64];
     int line_number;
+    int token_count;
 };
 
 struct stockData* allocate_stock() {
@@ -45,6 +46,36 @@ struct stockData* allocate_stock() {
     container->size = 0;
     container->capacity = INITIAL_CAPACITY;
     return container;
+}
+
+char* read_line(FILE* file) {
+    int buffer_size = 1024;
+    char* buffer = malloc(buffer_size);
+    if (buffer == NULL) {
+        return NULL;
+    }
+    int position = 0;
+    int c;
+    while ((c = fgetc(file)) != EOF) {
+        if (c == '\n') {
+            break;
+        }
+        buffer[position] = (char)c;
+        position++;
+        if (position >= buffer_size - 1) {
+            buffer_size *= 2;
+            buffer = realloc(buffer, buffer_size);
+            if (buffer == NULL) {
+                return NULL;
+            }
+        }
+    }
+    if (position == 0 && c == EOF) {
+        free(buffer);
+        return NULL;
+    }
+    buffer[position] = '\0';
+    return buffer;
 }
 
 int stock_data_csv() {
@@ -74,27 +105,27 @@ int stock_data_csv() {
     stock_array->capacity = INITIAL_CAPACITY;
     stock_array->records = malloc(INITIAL_CAPACITY * sizeof(struct stockRecord));
     if (stock_array->records == NULL) {
-    free(stock_array->records);
-    fclose(file);}
+        free(stock_array->records);
+        fclose(file);}
     return printf("Memory allocation failed for stock array\n");
 
-    char header_line = read_line(file);
+    char* header_line = read_line(file);
     if (header_line == NULL) {
     free(stock_array->records);
     fclose(file);
     return printf("File was empty or header is missing\n");
     }
 
-    expect_header = "Date Open, High, Low, Close, Volume";
+   char* expect_header = "Date Open, High, Low, Close, Volume";
     if (header_line != expect_header) {
         fprintf(stderr, "Header line mismatch detected. Format Undetected: %s + %s\n", expect_header, header_line);
     }
-    line_number = 1;
-    valid_records = 0;
-    invalid_records = 0;
+    int line_number = 1;
+    int valid_records = 0;
+    int invalid_records = 0;
 
     while (!feof(file)) {
-        line = read_line(file);
+        char* line = read_line(file);
         line_number++;
 
         if (line[0] == '#') {
