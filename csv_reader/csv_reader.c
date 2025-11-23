@@ -13,58 +13,60 @@ struct stockRecord {
     float low_price;
     float close_price;
     long int volume;
-    char *original_data_string;
 };
 
 struct stockData {
+    char ticker[16];
     struct stockRecord* records;
     int size;
     int capacity;
 };
 
+struct allStocksData {
+    struct stockData* stocks;
+    int num_stocks;
+    int capacity;
+};
+
 #define INITIAL_CAPACITY 100
 #define GROWTH_FACTOR 2
+#define MAX_LINE_LENGTH 50000
 
-struct parserResults {
-    bool success;
-    char error_message[256];
-    char* tokens[10];
-    int line_number;
-    int token_count;
-};
-
-struct validationResults {
-    bool success;
-    char error_message[256];
-    struct stockRecord* records;
-};
-
-struct addResults {
-    bool success;
-    char error_message[256];
-};
-
-struct parserResults parse_csv_line(char* line, int line_number);
-struct validationResults validate_csv_line(char** tokens, int token_count, int line_number);
-struct addResults add_stock_record(struct stockData* array, struct stockRecord* record);
-
-struct stockData* allocate_stock() {
-    struct stockData* container = malloc(sizeof(struct stockData));
+struct allStocksData* allocate_all_stocks(int num_stocks) {
+    struct allStocksData* container = malloc(sizeof(struct allStocksData));
     if (container == NULL) {
         return NULL;
     }
-    container->records = malloc(INITIAL_CAPACITY * sizeof(struct stockRecord));
-    if (container->records == NULL) {
+
+    container->stocks = malloc(num_stocks * sizeof(struct stockData));
+    if (container->stocks == NULL) {
         free(container);
         return NULL;
     }
-    container->size = 0;
-    container->capacity = INITIAL_CAPACITY;
+
+    for (int i = 0; i < num_stocks; i++) {
+        container->stocks[i].records = malloc(INITIAL_CAPACITY * sizeof(struct stockRecord));
+        if (container->stocks[i].records == NULL) {
+            for (int j = 0; j < i; j++) {
+                free(container->stocks[j].records);
+            }
+            free(container->stocks);
+            free(container);
+            return NULL;
+        }
+        container->stocks[i].size = 0;
+        container->stocks[i].capacity = INITIAL_CAPACITY;
+        container->stocks[i].ticker[0] = '\0';
+    }
+
+    container->num_stocks = num_stocks;
+    container->capacity = num_stocks;
+
     return container;
 }
 
 char* read_line(FILE* file) {
-    int buffer_size = 1024;
+    int buffer_size = MAX_LINE_LENGTH;
     char* buffer = malloc(buffer_size);
     if (buffer == NULL) {
         return NULL;
@@ -72,17 +74,25 @@ char* read_line(FILE* file) {
     int position = 0;
     int c;
     while ((c = fgetc(file)) != EOF) {
-        if (c == '\n') {
+        if (c == '\n' || c == '\r') {
+            if (c == '\r') {
+                c = fgetc(file);
+                if (c != '\n' && c != EOF) {
+                    ungetc(c, file);
+                }
+            }
             break;
         }
         buffer[position] = (char)c;
         position++;
         if (position >= buffer_size - 1) {
             buffer_size *= 2;
-            buffer = realloc(buffer, buffer_size);
-            if (buffer == NULL) {
+            char* new_buffer = realloc(buffer, buffer_size);
+            if (new_buffer == NULL) {
+                free(buffer);
                 return NULL;
             }
+            buffer = new_buffer;
         }
     }
     if (position == 0 && c == EOF) {
@@ -93,7 +103,201 @@ char* read_line(FILE* file) {
     return buffer;
 }
 
-struct stockData* stock_data_csv(void) {
+int count_unique_tickers(char* ticker_line) {
+    if (ticker_line == NULL) return 0;
+
+    size_t len = strlen(ticker_line) + 1;
+    char* line_copy = malloc(len);
+    if (line_copy == NULL) return 0;
+
+    strcpy_s(line_copy, len, ticker_line);
+
+    char tickers[100][16];
+    int num_tickers = 0;
+
+    char* next_token = NULL;
+    char* token = strtok_s(line_copy, ",", &next_token);
+    if (token && strcmp(token, "Ticker") == 0) {
+        token = strtok_s(NULL, ",", &next_token);
+    }
+
+    while (token != NULL && num_tickers < 100) {
+        int found = 0;
+        for (int i = 0; i < num_tickers; i++) {
+            if (strcmp(tickers[i], token) == 0) {
+                found = 1;
+                break;
+            }
+        }
+        if (!found) {
+            strncpy_s(tickers[num_tickers], 16, token, 15);
+            num_tickers++;
+        }
+        token = strtok_s(NULL, ",", &next_token);
+    }
+
+    free(line_copy);
+    return num_tickers;
+}
+
+void extract_tickers(char* ticker_line, struct allStocksData* all_stocks) {
+    if (ticker_line == NULL || all_stocks == NULL) return;
+
+    size_t len = strlen(ticker_line) + 1;
+    char* line_copy = malloc(len);
+    if (line_copy == NULL) return;
+
+    strcpy_s(line_copy, len, ticker_line);
+
+    char tickers[100][16];
+    int num_tickers = 0;
+
+    char* next_token = NULL;
+    char* token = strtok_s(line_copy, ",", &next_token);
+    if (token && strcmp(token, "Ticker") == 0) {
+        token = strtok_s(NULL, ",", &next_token);
+    }
+
+    while (token != NULL && num_tickers < 100) {
+        int found = -1;
+        for (int i = 0; i < num_tickers; i++) {
+            if (strcmp(tickers[i], token) == 0) {
+                found = i;
+                break;
+            }
+        }
+        if (found == -1) {
+            strncpy_s(tickers[num_tickers], 16, token, 15);
+            strncpy_s(all_stocks->stocks[num_tickers].ticker, 16, token, 15);
+            num_tickers++;
+        }
+        token = strtok_s(NULL, ",", &next_token);
+    }
+
+    free(line_copy);
+}
+
+bool add_record_to_stock(struct stockData* stock, struct stockRecord* record) {
+    if (stock->size >= stock->capacity) {
+        int new_capacity = stock->capacity * GROWTH_FACTOR;
+        struct stockRecord* new_records = realloc(stock->records,
+                                                   new_capacity * sizeof(struct stockRecord));
+        if (new_records == NULL) {
+            return false;
+        }
+        stock->records = new_records;
+        stock->capacity = new_capacity;
+    }
+
+    stock->records[stock->size] = *record;
+    stock->size++;
+    return true;
+}
+
+bool parse_data_line(char* line, struct allStocksData* all_stocks, int line_number) {
+    if (line == NULL || all_stocks == NULL) return false;
+
+    size_t len = strlen(line) + 1;
+    char* line_copy = malloc(len);
+    if (line_copy == NULL) return false;
+
+    strcpy_s(line_copy, len, line);
+
+    char* tokens[1000];
+    int token_count = 0;
+
+    char* next_token = NULL;
+    char* token = strtok_s(line_copy, ",", &next_token);
+    while (token != NULL && token_count < 1000) {
+        tokens[token_count] = token;
+        token_count++;
+        token = strtok_s(NULL, ",", &next_token);
+    }
+
+    if (token_count < 1) {
+        free(line_copy);
+        return false;
+    }
+
+    int year, month, day;
+    if (sscanf_s(tokens[0], "%d-%d-%d", &year, &month, &day) != 3) {
+        free(line_copy);
+        return false;
+    }
+
+    int expected_tokens = 1 + (all_stocks->num_stocks * 5);
+    if (token_count < expected_tokens) {
+        fprintf(stderr, "Line %d: Expected %d tokens, got %d\n",
+                line_number, expected_tokens, token_count);
+        free(line_copy);
+        return false;
+    }
+
+    int token_idx = 1;
+    for (int stock_idx = 0; stock_idx < all_stocks->num_stocks; stock_idx++) {
+        struct stockRecord record;
+        record.year = year;
+        record.month = month;
+        record.day = day;
+
+        if (token_idx + 4 >= token_count) {
+            fprintf(stderr, "Line %d: Not enough data for stock %s\n",
+                    line_number, all_stocks->stocks[stock_idx].ticker);
+            free(line_copy);
+            return false;
+        }
+
+        if (sscanf_s(tokens[token_idx], "%f", &record.open_price) != 1) {
+            fprintf(stderr, "Line %d: Invalid open price for %s: '%s'\n",
+                    line_number, all_stocks->stocks[stock_idx].ticker, tokens[token_idx]);
+            token_idx += 5;
+            continue;
+        }
+        token_idx++;
+
+        if (sscanf_s(tokens[token_idx], "%f", &record.high_price) != 1) {
+            fprintf(stderr, "Line %d: Invalid high price for %s\n",
+                    line_number, all_stocks->stocks[stock_idx].ticker);
+            token_idx += 4;
+            continue;
+        }
+        token_idx++;
+
+        if (sscanf_s(tokens[token_idx], "%f", &record.low_price) != 1) {
+            fprintf(stderr, "Line %d: Invalid low price for %s\n",
+                    line_number, all_stocks->stocks[stock_idx].ticker);
+            token_idx += 3;
+            continue;
+        }
+        token_idx++;
+
+        if (sscanf_s(tokens[token_idx], "%f", &record.close_price) != 1) {
+            fprintf(stderr, "Line %d: Invalid close price for %s\n",
+                    line_number, all_stocks->stocks[stock_idx].ticker);
+            token_idx += 2;
+            continue;
+        }
+        token_idx++;
+
+        if (sscanf_s(tokens[token_idx], "%ld", &record.volume) != 1) {
+            fprintf(stderr, "Line %d: Invalid volume for %s\n",
+                    line_number, all_stocks->stocks[stock_idx].ticker);
+            token_idx++;
+            continue;
+        }
+        token_idx++;
+
+        if (!add_record_to_stock(&all_stocks->stocks[stock_idx], &record)) {
+            fprintf(stderr, "Line %d: Failed to add record for %s\n",
+                    line_number, all_stocks->stocks[stock_idx].ticker);
+        }
+    }
+
+    free(line_copy);
+    return true;
+}
+
+struct allStocksData* stock_data_csv(void) {
     const char *filename = "../CSV/all_stocks_combined.csv";
     FILE *file = NULL;
     errno_t err = fopen_s(&file, filename, "r");
@@ -109,33 +313,62 @@ struct stockData* stock_data_csv(void) {
         return NULL;
     }
 
-    struct stockData* stock_array = allocate_stock();
-    if (stock_array == NULL) {
+    char* ticker_line = read_line(file);
+    if (ticker_line == NULL) {
         fclose(file);
-        printf("Memory allocation failed for stock array\n");
+        printf("Failed to read ticker line\n");
         return NULL;
     }
 
-    char* header_line = read_line(file);
-    if (header_line == NULL) {
-        free(stock_array->records);
-        free(stock_array);
+    int num_stocks = count_unique_tickers(ticker_line);
+    printf("Found %d unique stocks in the file\n", num_stocks);
+
+    if (num_stocks == 0) {
+        free(ticker_line);
         fclose(file);
-        printf("File was empty or header is missing\n");
+        printf("No stocks found in file\n");
         return NULL;
     }
 
-    char* expect_header = "Date,Open,High,Low,Close,Volume";
-    if (strcmp(header_line, expect_header) != 0) {
-        fprintf(stderr, "Header line mismatch detected. Expected: %s Got: %s\n",
-                expect_header, header_line);
+    struct allStocksData* all_stocks = allocate_all_stocks(num_stocks);
+    if (all_stocks == NULL) {
+        free(ticker_line);
+        fclose(file);
+        printf("Memory allocation failed\n");
+        return NULL;
     }
 
-    free(header_line);
+    extract_tickers(ticker_line, all_stocks);
+    free(ticker_line);
 
-    int line_number = 1;
-    int valid_records = 0;
-    int invalid_records = 0;
+    char* price_line = read_line(file);
+    if (price_line == NULL) {
+        for (int i = 0; i < all_stocks->num_stocks; i++) {
+            free(all_stocks->stocks[i].records);
+        }
+        free(all_stocks->stocks);
+        free(all_stocks);
+        fclose(file);
+        printf("Failed to read price line\n");
+        return NULL;
+    }
+    free(price_line);
+
+    char* date_header = read_line(file);
+    if (date_header == NULL) {
+        for (int i = 0; i < all_stocks->num_stocks; i++) {
+            free(all_stocks->stocks[i].records);
+        }
+        free(all_stocks->stocks);
+        free(all_stocks);
+        fclose(file);
+        printf("Failed to read date header\n");
+        return NULL;
+    }
+    free(date_header);
+
+    int line_number = 3;
+    int total_lines = 0;
 
     while (!feof(file)) {
         char* line = read_line(file);
@@ -146,229 +379,58 @@ struct stockData* stock_data_csv(void) {
 
         line_number++;
 
-        if (line[0] == '#') {
+        if (strlen(line) == 0 || line[0] == '#') {
             free(line);
             continue;
         }
 
-        struct parserResults parse_result = parse_csv_line(line, line_number);
-        if (!parse_result.success) {
-            fprintf(stderr, "%s\n", parse_result.error_message);
-            invalid_records++;
-            free(line);
-            continue;
+        if (parse_data_line(line, all_stocks, line_number)) {
+            total_lines++;
         }
 
-        if (parse_result.token_count != 6) {
-            fprintf(stderr, "Line %d: Expected 6 tokens but found %d\n",
-                    line_number, parse_result.token_count);
-            invalid_records++;
-            for (int i = 0; i < parse_result.token_count; i++) {
-                free(parse_result.tokens[i]);
-            }
-            free(line);
-            continue;
-        }
-
-        struct validationResults validate_results = validate_csv_line(parse_result.tokens, parse_result.token_count, line_number);
-
-        for (int i = 0; i < parse_result.token_count; i++) {
-            free(parse_result.tokens[i]);
-        }
-
-        if (!validate_results.success) {
-            fprintf(stderr, "%s\n", validate_results.error_message);
-            invalid_records++;
-            free(line);
-            continue;
-        }
-
-        struct addResults add_result = add_stock_record(stock_array, validate_results.records);
-        if (!add_result.success) {
-            fprintf(stderr, "Failed to add record at line %d: %s\n",
-                    line_number, add_result.error_message);
-
-            free(validate_results.records);
-            free(line);
-            free(stock_array->records);
-            free(stock_array);
-            fclose(file);
-            return NULL;
-        }
-
-        free(validate_results.records);
-        valid_records++;
         free(line);
-    }
-
-    fprintf(stdout, "Successfully loaded %d stock records\n", valid_records);
-    if (invalid_records > 0) {
-        fprintf(stdout, "Skipped %d invalid records\n", invalid_records);
-    }
-
-    if (valid_records == 0) {
-        free(stock_array->records);
-        free(stock_array);
-        fclose(file);
-        fprintf(stderr, "No valid records found in file\n");
-        return NULL;
     }
 
     fclose(file);
 
-    return stock_array;
-}
-
-struct parserResults parse_csv_line(char* line, int line_number) {
-    struct parserResults result;
-    result.success = false;
-    result.token_count = 0;
-    result.line_number = line_number;
-
-    if (line == NULL || strlen(line) == 0) {
-        snprintf(result.error_message, sizeof(result.error_message),
-                "Line %d: Empty line", line_number);
-        return result;
+    printf("\nSuccessfully parsed %d data lines\n", total_lines);
+    printf("\nStock summary:\n");
+    for (int i = 0; i < all_stocks->num_stocks; i++) {
+        printf("  %-10s: %d records\n",
+               all_stocks->stocks[i].ticker,
+               all_stocks->stocks[i].size);
     }
 
-    char* line_copy = strdup(line);
-    if (line_copy == NULL) {
-        snprintf(result.error_message, sizeof(result.error_message),
-                "Line %d: Memory allocation failed", line_number);
-        return result;
-    }
-
-    char* token = strtok(line_copy, ",");
-    while (token != NULL && result.token_count < 10) {
-        result.tokens[result.token_count] = strdup(token);
-        if (result.tokens[result.token_count] == NULL) {
-            snprintf(result.error_message, sizeof(result.error_message),
-                    "Line %d: Memory allocation failed for token", line_number);
-            free(line_copy);
-            for (int i = 0; i < result.token_count; i++) {
-                free(result.tokens[i]);
-            }
-            return result;
-        }
-        result.token_count++;
-        token = strtok(NULL, ",");
-    }
-
-    free(line_copy);
-    result.success = true;
-    return result;
-}
-
-struct validationResults validate_csv_line(char** tokens, int token_count, int line_number) {
-    struct validationResults result;
-    result.success = false;
-    result.records = NULL;
-
-    if (token_count != 6) {
-        snprintf(result.error_message, sizeof(result.error_message),
-                "Line %d: Expected 6 fields but got %d", line_number, token_count);
-        return result;
-    }
-
-    struct stockRecord* record = malloc(sizeof(struct stockRecord));
-    if (record == NULL) {
-        snprintf(result.error_message, sizeof(result.error_message),
-                "Line %d: Memory allocation failed", line_number);
-        return result;
-    }
-
-    if (sscanf_s(tokens[0], "%d-%d-%d", &record->year, &record->month, &record->day) != 3) {
-        snprintf(result.error_message, sizeof(result.error_message),
-                "Line %d: Invalid date format '%s'", line_number, tokens[0]);
-        free(record);
-        return result;
-    }
-
-    if (sscanf_s(tokens[1], "%f", &record->open_price) != 1) {
-        snprintf(result.error_message, sizeof(result.error_message),
-                "Line %d: Invalid open price '%s'", line_number, tokens[1]);
-        free(record);
-        return result;
-    }
-
-    if (sscanf_s(tokens[2], "%f", &record->high_price) != 1) {
-        snprintf(result.error_message, sizeof(result.error_message),
-                "Line %d: Invalid high price '%s'", line_number, tokens[2]);
-        free(record);
-        return result;
-    }
-
-    if (sscanf_s(tokens[3], "%f", &record->low_price) != 1) {
-        snprintf(result.error_message, sizeof(result.error_message),
-                "Line %d: Invalid low price '%s'", line_number, tokens[3]);
-        free(record);
-        return result;
-    }
-
-    if (sscanf_s(tokens[4], "%f", &record->close_price) != 1) {
-        snprintf(result.error_message, sizeof(result.error_message),
-                "Line %d: Invalid close price '%s'", line_number, tokens[4]);
-        free(record);
-        return result;
-    }
-
-    if (sscanf_s(tokens[5], "%ld", &record->volume) != 1) {
-        snprintf(result.error_message, sizeof(result.error_message),
-                "Line %d: Invalid volume '%s'", line_number, tokens[5]);
-        free(record);
-        return result;
-    }
-
-    record->original_data_string = NULL;
-
-    result.success = true;
-    result.records = record;
-    return result;
-}
-
-struct addResults add_stock_record(struct stockData* array, struct stockRecord* record) {
-    struct addResults result;
-    result.success = false;
-
-    if (array == NULL || record == NULL) {
-        snprintf(result.error_message, sizeof(result.error_message),
-                "Invalid array or record pointer");
-        return result;
-    }
-
-    if (array->size >= array->capacity) {
-        int new_capacity = array->capacity * GROWTH_FACTOR;
-        struct stockRecord* new_records = realloc(array->records,
-                                                   new_capacity * sizeof(struct stockRecord));
-        if (new_records == NULL) {
-            snprintf(result.error_message, sizeof(result.error_message),
-                    "Failed to resize array");
-            return result;
-        }
-        array->records = new_records;
-        array->capacity = new_capacity;
-    }
-
-    array->records[array->size] = *record;
-    array->size++;
-
-    result.success = true;
-    return result;
+    return all_stocks;
 }
 
 int main(void) {
-    struct stockData* data = stock_data_csv();
+    struct allStocksData* data = stock_data_csv();
 
     if (data == NULL) {
         printf("Failed to load stock data\n");
         return 1;
     }
 
-    printf("\nFirst record:\n");
-    printf("Date: %d-%02d-%02d\n", data->records[0].year, data->records[0].month, data->records[0].day);
-    printf("Close: %.2f\n", data->records[0].close_price);
+    printf("\n=== Sample Data ===\n");
+    for (int i = 0; i < data->num_stocks && i < 3; i++) {
+        if (data->stocks[i].size > 0) {
+            printf("\n%s - First record:\n", data->stocks[i].ticker);
+            printf("  Date: %d-%02d-%02d\n",
+                   data->stocks[i].records[0].year,
+                   data->stocks[i].records[0].month,
+                   data->stocks[i].records[0].day);
+            printf("  Open: %.2f, Close: %.2f\n",
+                   data->stocks[i].records[0].open_price,
+                   data->stocks[i].records[0].close_price);
+            printf("  Volume: %ld\n", data->stocks[i].records[0].volume);
+        }
+    }
 
-    free(data->records);
+    for (int i = 0; i < data->num_stocks; i++) {
+        free(data->stocks[i].records);
+    }
+    free(data->stocks);
     free(data);
 
     return 0;
