@@ -355,3 +355,21 @@ struct addResults add_stock_record(struct stockData* array, struct stockRecord* 
     result.success = true;
     return result;
 }
+
+int main(void) {
+    struct stockData* data = stock_data_csv();
+
+    if (data == NULL) {
+        printf("Failed to load stock data\n");
+        return 1;
+    }
+
+    printf("\nFirst record:\n");
+    printf("Date: %d-%02d-%02d\n", data->records[0].year, data->records[0].month, data->records[0].day);
+    printf("Close: %.2f\n", data->records[0].close_price);
+
+    free(data->records);
+    free(data);
+
+    return 0;
+}
