@@ -1,36 +1,9 @@
+#include "stock_data.h"
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <string.h>
 #include <errno.h>
-
-struct stockRecord {
-    int year;
-    int month;
-    int day;
-    float open_price;
-    float high_price;
-    float low_price;
-    float close_price;
-    long int volume;
-};
-
-struct stockData {
-    char ticker[16];
-    struct stockRecord* records;
-    int size;
-    int capacity;
-};
-
-struct allStocksData {
-    struct stockData* stocks;
-    int num_stocks;
-    int capacity;
-};
-
-#define INITIAL_CAPACITY 100
-#define GROWTH_FACTOR 2
-#define MAX_LINE_LENGTH 50000
 
 struct allStocksData* allocate_all_stocks(int num_stocks) {
     struct allStocksData* container = malloc(sizeof(struct allStocksData));
