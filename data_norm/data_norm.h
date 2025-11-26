@@ -1,13 +1,18 @@
+#pragma once
 #ifdef NORMALIZATION_H
 #define NORMALIZATION_H
 
 #include <stdbool.h>
+
+// Defines the normalization method that will be encompassed with later features
 
 typedef enum {
     NORM_MINMAX,
     NORM_ZSCORE,
     NORM_NONE
 } Normalization_type;
+
+// Params that are needed to normalize and denormalize a given feature
 
 struct Normalization {
     Normalization_type type;
@@ -18,19 +23,25 @@ struct Normalization {
     bool all_same_value;
     float constant_value;
 
-    char feature_name[32];
+    char feature_name[32]; // debugging variable
 };
+
+// Contains the params for each individual stock
 
 struct stockNormalization {
     char ticker[16];
     struct Normalization params[5];
-    int num_params;
+    int num_features;
+
+    // Meta data
     int num_records_used;
     int year_start, month_start, day_start, hour_start, min_start, sec_start;
     int year_end, month_end, day_end, hour_end, min_end, sec_end;
+
+    // Look up to original data set
     int stock_index;
 };
-
+//Holds normalizers for all given stocks within the csv_reader
 struct allStockNormalization {
     struct stockNormalization* normalizers;
     int num_stocks;
@@ -39,7 +50,7 @@ struct allStockNormalization {
     Normalization_type default_price_norm;
     Normalization_type stock_norm;
 };
-
+// Keeps data in separate arrays, aiming to increase batch operations speed
 struct normalizedStockData {
     char ticker[16];
     float* open_prices_norm;
@@ -57,7 +68,7 @@ struct normalizedStockData {
 
     int size;
     int capacity;
-    int normalization_index;
+    int normalization_index; // Links to the normalizer for specific stock
 };
 
 struct allNormalizedStocks {
@@ -66,29 +77,7 @@ struct allNormalizedStocks {
     int capacity;
 };
 
-struct normalizedStockRecord {
-    int year;
-    int month;
-    int day;
-    int hour;
-    int min;
-    int sec;
-
-    float open_price_norm;
-    float high_price_norm;
-    float low_price_norm;
-    float close_price_norm;
-    float volumes_norm;
-};
-
-struct normalizedStockDataRecords {
-    char ticker[16];
-    struct normalizedStockRecord* records;
-    int size;
-    int capacity;
-    int normalization_index;
-};
-
+// helper function
 struct featureArray {
     float* values;
     int size;
