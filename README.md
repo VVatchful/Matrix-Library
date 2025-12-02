@@ -468,7 +468,6 @@ MIT License - See [LICENSE](LICENSE) file for details.
 Questions? Found a bug? Have suggestions?
 
 - **Open an issue**: [GitHub Issues](https://github.com/VVatchful/Matrix-Library/issues)
-- **Email**: your.email@example.com
 - **Discussion**: Feel free to fork and experiment!
 
 ---
