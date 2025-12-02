@@ -98,25 +98,13 @@ double leaky_relu(double input_value) {
     }
 }
 
-double leay_derivative(double input_value, double alpha) {
+double leaky_relu_derivative(double input_value, double alpha) {
     if (input_value > 0.0) {
         return 1.0;
     } else {
         return alpha;
     }
 }
-/*
-
-void softmax(double input_array, double output_array, double array_length) {
-    double max_val = input_array[0];
-    for (i = 1; i < array_length; i++) {
-        if (input_array[i] > max_val) {
-            max_val = input_array[i]
-        }
-    }
-}
-
-*/
 
 double hard_sigmoid(double input_value) {
     double result  = 0.2 * input_value + 0.5;

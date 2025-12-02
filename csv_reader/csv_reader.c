@@ -4,6 +4,19 @@
 #include <string.h>
 #include <errno.h>
 
+#ifdef _WIN32
+#else
+    #define strcpy_s(dest, size, src) strncpy(dest, src, size)
+    #define strncpy_s(dest, size, src, count) strncpy(dest, src, count)
+    #define sscanf_s sscanf
+    #define fopen_s(fp, filename, mode) ((*fp = fopen(filename, mode)) == NULL ? -1 : 0)
+
+    // strtok_s replacement
+    char* strtok_s(char* str, const char* delim, char** context) {
+        return strtok_r(str, delim, context);
+    }
+#endif
+
 struct stockRecord {
     int year;
     int month;
